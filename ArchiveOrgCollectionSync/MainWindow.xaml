@@ -5,10 +5,10 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
     Title="Archive.org Collection Sync"
-    Height="323"
-    Width="600"
-    ResizeMode="CanMinimize"
-    WindowStartupLocation="CenterScreen">
+    Height="423"
+    Width="700"
+    WindowStartupLocation="CenterScreen"
+    ResizeMode="CanResizeWithGrip">
     <TabControl Margin="15,10,15,15">
         <TabItem Header="Download/Sync">
             <DockPanel Margin="15,10,15,15">
@@ -32,17 +32,41 @@
                         <Button x:Name="BrowseButton" Grid.Column="1" Click="BrowseButton_Click">Browse...</Button>
                     </Grid>
                 </StackPanel>
-                <Grid DockPanel.Dock="Bottom" Height="24" VerticalAlignment="Bottom">
+                <Grid DockPanel.Dock="Bottom" VerticalAlignment="Bottom">
+                    <Grid.RowDefinitions>
+                        <RowDefinition />
+                        <RowDefinition />
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="80" />
                     </Grid.ColumnDefinitions>
-                    <ProgressBar x:Name="ProgressBar" Grid.Column="0" Margin="0,0,10,0" />
-                    <Button x:Name="StartPauseButton" Grid.Column="1" IsEnabled="False" Click="StartPauseButton_Click">Start</Button>
+                    <TextBlock x:Name="ProgressTextBlock" Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="0" Margin="0,0,0,5" />
+                    <ProgressBar x:Name="ProgressBar" Grid.Column="0" Grid.Row="1" Margin="0,0,10,0" Height="24" />
+                    <Button x:Name="StartButton" Grid.Column="1" Grid.Row="1" IsEnabled="False" Click="StartButton_Click" Height="24">Start</Button>
                 </Grid>
             </DockPanel>
         </TabItem>
+        <TabItem Header="Log">
+            <ListBox x:Name="LogListBox" Margin="15">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Message}" Foreground="{Binding Brush}" />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </TabItem>
         <TabItem Header="About">
+            <ScrollViewer>
+                <StackPanel Margin="10">
+                    <TextBlock TextWrapping="Wrap" FontStyle="Italic">But God showed his great love for us by sending Christ to die for us while we were still sinners. - Romans 5:8 (NLT)</TextBlock>
+                    <TextBlock TextWrapping="Wrap" Margin="0,10,0,0">MIT License</TextBlock>
+                    <TextBlock TextWrapping="Wrap" Margin="0,10,0,0">Copyright (c) 2022 Unbroken Software, LLC</TextBlock>
+                    <TextBlock TextWrapping="Wrap" Margin="0,10,0,0">Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</TextBlock>
+                    <TextBlock TextWrapping="Wrap" Margin="0,10,0,0">The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</TextBlock>
+                    <TextBlock TextWrapping="Wrap" Margin="0,10,0,0">THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</TextBlock>
+                </StackPanel>
+            </ScrollViewer>
         </TabItem>
     </TabControl>
 </Window>

@@ -1,6 +1,7 @@
 ﻿namespace ArchiveOrgCollectionSync
 {
     using System;
+    using System.Collections.Generic;
     using System.IO;
     using System.Linq;
     using System.Net;
@@ -9,6 +10,7 @@
     using System.Threading.Tasks;
     using System.Windows;
     using System.Windows.Controls;
+    using System.Windows.Media;
     using System.Xml.Serialization;
 
     using Microsoft.WindowsAPICodePack.Dialogs;
@@ -58,10 +60,10 @@
 
         private void TextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            this.StartPauseButton.IsEnabled = this.FolderTextBox.Text.Trim().Length > 0 && this.UrlTextBox.Text.Trim().Length > 0;
+            this.StartButton.IsEnabled = this.FolderTextBox.Text.Trim().Length > 0 && this.UrlTextBox.Text.Trim().Length > 0;
         }
 
-        private void StartPauseButton_Click(object sender, RoutedEventArgs e)
+        private void StartButton_Click(object sender, RoutedEventArgs e)
         {
             if (!this.UrlTextBox.Text.Trim().StartsWith("https://archive.org/details/", StringComparison.OrdinalIgnoreCase) || this.UrlTextBox.Text.Trim().Length < 29)
             {
@@ -81,10 +83,52 @@
             this.Start(collectionName, folder);
         }
 
+        private void ChangeState(bool running)
+        {
+            this.Dispatcher.Invoke(() =>
+            {
+                this.StartButton.IsEnabled =
+                    this.UrlTextBox.IsEnabled =
+                    this.FolderTextBox.IsEnabled =
+                    this.PasteButton.IsEnabled =
+                    this.BrowseButton.IsEnabled =
+                    !running;
+            });
+        }
+
+        private void Report(string message, bool error = false, bool complete = false)
+        {
+            this.Dispatcher.Invoke(() =>
+            {
+                this.ProgressTextBlock.Text = message;
+                
+                if (error)
+                {
+                    this.ProgressTextBlock.Foreground = new SolidColorBrush(Colors.Red);
+                }
+                else if (complete)
+                {
+                    this.ProgressTextBlock.Foreground = new SolidColorBrush(Colors.Green);
+                }
+                else
+                {
+                    this.ProgressTextBlock.Foreground = SystemColors.ControlTextBrush;
+                }
+
+                var item = new LogItem(message, error, complete);
+                this.LogListBox.Items.Add(item);
+                this.LogListBox.SelectedIndex = this.LogListBox.Items.Count - 1;
+                this.LogListBox.ScrollIntoView(item);
+            });
+        }
+
         private void Start(string collectionName, string folder)
         {
             ThreadPool.QueueUserWorkItem(_ =>
             {
+                this.ChangeState(true);
+                this.Report("Scanning archive.org collection files...");
+
                 string collectionXmlUrl = $"https://archive.org/download/{collectionName}/{collectionName}_files.xml";
                 string collectionXml;
 
@@ -97,25 +141,41 @@
                 }
                 catch (Exception ex)
                 {
-                    this.Dispatcher.Invoke(() => MessageBox.Show(this, $"Unable to parse collection metadata. Are you sure that it exists?\n\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error));
+                    this.Report($"Unable to parse collection metadata; the XML list of files could not be downloaded. - {ex.Message}", true);
                     return;
                 }
 
-                var serializer = new XmlSerializer(typeof(FileCollection));
                 File[] files;
-                int count = 0;
 
-                using (var reader = new StringReader(collectionXml))
+                try
                 {
-                    files = ((FileCollection)serializer.Deserialize(reader)).Files;
+                    var serializer = new XmlSerializer(typeof(FileCollection));
+
+                    using (var reader = new StringReader(collectionXml))
+                    {
+                        files = ((FileCollection)serializer.Deserialize(reader)).Files;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    this.Report($"Unable to deserialize the list of files from archive.org. - {ex.Message}", true);
+                    return;
                 }
 
                 this.Dispatcher.Invoke(() => this.ProgressBar.Maximum = files.Length);
 
+                int count = 0;
+
                 Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = 10 }, file =>
                 {
-                    this.Dispatcher.Invoke(() => this.ProgressBar.Value = count);
+                    this.Dispatcher.Invoke(() =>
+                    {
+                        this.ProgressBar.Value = count;
+                    });
+                    
                     count++;
+
+                    this.Report($"Reading disk file {file.Name}...");
 
                     string destinationFilePath = Path.Combine(folder, file.Name);
 
@@ -123,10 +183,16 @@
                     {
                         if (new FileInfo(destinationFilePath).Length == file.Size && MainWindow.ConfirmMd5(destinationFilePath, file.Md5))
                         {
+                            this.Report($"File {file.Name} already exists with the correct file size and checksum. Skipping!");
                             return;
                         }
 
+                        this.Report($"Existing file {file.Name} has an incorrect file size or checksum! Redownloading file...", true);
                         System.IO.File.Delete(destinationFilePath);
+                    }
+                    else
+                    {
+                        this.Report($"File {file.Name} does not exist on disk! Downloading file...");
                     }
 
                     using (var client = new WebClient())
@@ -137,18 +203,23 @@
                         }
                         catch (Exception ex)
                         {
-                            this.Dispatcher.Invoke(() => MessageBox.Show(this, $"An error occurred downloading file {file.Name}.\n\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error));
+                            this.Report($"An error occurred downloading file {file.Name}. - {ex.Message}", true);
                             return;
                         }
                     }
 
-                    if (!MainWindow.ConfirmMd5(destinationFilePath, file.Md5))
+                    if (MainWindow.ConfirmMd5(destinationFilePath, file.Md5))
                     {
-                        this.Dispatcher.Invoke(() => MessageBox.Show(this, $"Checksum does not match on file {file.Name}!", "Error", MessageBoxButton.OK, MessageBoxImage.Error));
+                        this.Report($"File {file.Name} downloaded successfully and checksum confirmed!");
+                    }
+                    else
+                    {
+                        this.Report($"Checksum does not match on file {file.Name} after downloading!", true);
                     }
                 });
 
-                this.Dispatcher.Invoke(() => MessageBox.Show(this, $"Process is complete!", "Success", MessageBoxButton.OK, MessageBoxImage.Information));
+                this.Report($"Process is complete!", false, true);
+                this.ChangeState(false);
             });
         }
 
