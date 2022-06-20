@@ -8,7 +8,7 @@
     Height="423"
     Width="700"
     WindowStartupLocation="CenterScreen"
-    ResizeMode="CanResizeWithGrip">
+    ResizeMode="CanResizeWithGrip" Icon="/archive.ico">
     <TabControl Margin="15,10,15,15">
         <TabItem Header="Download/Sync">
             <DockPanel Margin="15,10,15,15">
