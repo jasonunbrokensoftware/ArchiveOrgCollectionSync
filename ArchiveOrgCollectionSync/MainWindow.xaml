@@ -1,0 +1,48 @@
+﻿<Window x:Class="ArchiveOrgCollectionSync.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Archive.org Collection Sync"
+    Height="323"
+    Width="600"
+    ResizeMode="CanMinimize"
+    WindowStartupLocation="CenterScreen">
+    <TabControl Margin="15,10,15,15">
+        <TabItem Header="Download/Sync">
+            <DockPanel Margin="15,10,15,15">
+                <StackPanel DockPanel.Dock="Top">
+                    <TextBlock>Archive.org Collection URL:</TextBlock>
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="80" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="UrlTextBox" Padding="3" Margin="0,0,10,0" Grid.Column="0" MaxLines="1" TextChanged="TextBox_TextChanged" />
+                        <Button x:Name="PasteButton" Grid.Column="1" Click="PasteButton_Click">Paste</Button>
+                    </Grid>
+                    <TextBlock Margin="0,10,0,0">Destination Folder:</TextBlock>
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="80" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="FolderTextBox" Padding="3" Grid.Column="0" Margin="0,0,10,0" MaxLines="1" TextChanged="TextBox_TextChanged" />
+                        <Button x:Name="BrowseButton" Grid.Column="1" Click="BrowseButton_Click">Browse...</Button>
+                    </Grid>
+                </StackPanel>
+                <Grid DockPanel.Dock="Bottom" Height="24" VerticalAlignment="Bottom">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="80" />
+                    </Grid.ColumnDefinitions>
+                    <ProgressBar x:Name="ProgressBar" Grid.Column="0" Margin="0,0,10,0" />
+                    <Button x:Name="StartPauseButton" Grid.Column="1" IsEnabled="False" Click="StartPauseButton_Click">Start</Button>
+                </Grid>
+            </DockPanel>
+        </TabItem>
+        <TabItem Header="About">
+        </TabItem>
+    </TabControl>
+</Window>
