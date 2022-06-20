@@ -90,6 +90,9 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="PatientWebClient.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>

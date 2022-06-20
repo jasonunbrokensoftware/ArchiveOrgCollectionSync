@@ -134,7 +134,7 @@
 
                 try
                 {
-                    using (var client = new WebClient())
+                    using (var client = new PatientWebClient())
                     {
                         collectionXml = client.DownloadString(collectionXmlUrl);
                     }
@@ -195,7 +195,7 @@
                         this.Report($"File {file.Name} does not exist on disk! Downloading file...");
                     }
 
-                    using (var client = new WebClient())
+                    using (var client = new PatientWebClient())
                     {
                         try
                         {
