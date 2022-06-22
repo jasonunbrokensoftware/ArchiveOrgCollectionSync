@@ -1,10 +1,8 @@
 ﻿namespace ArchiveOrgCollectionSync
 {
     using System;
-    using System.Collections.Generic;
     using System.IO;
     using System.Linq;
-    using System.Net;
     using System.Security.Cryptography;
     using System.Threading;
     using System.Threading.Tasks;
@@ -93,6 +91,11 @@
                     this.PasteButton.IsEnabled =
                     this.BrowseButton.IsEnabled =
                     !running;
+
+                if (!running)
+                {
+                    this.ProgressBar.Value = 0;
+                }
             });
         }
 
@@ -101,6 +104,7 @@
             this.Dispatcher.Invoke(() =>
             {
                 this.ProgressTextBlock.Text = message;
+                this.ProgressTextBlock.Visibility = Visibility.Visible;
                 
                 if (error)
                 {
@@ -165,15 +169,19 @@
                 this.Dispatcher.Invoke(() => this.ProgressBar.Maximum = files.Length);
 
                 int count = 0;
+                int skippingCount = 0;
+                int downloadErrorCount = 0;
+                int downloadCorruptCount = 0;
+                int downloadSuccessCount = 0;
 
                 Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = 10 }, file =>
-                {
+                {                   
+                    count++;
+
                     this.Dispatcher.Invoke(() =>
                     {
                         this.ProgressBar.Value = count;
                     });
-                    
-                    count++;
 
                     this.Report($"Reading disk file {file.Name}...");
 
@@ -181,9 +189,11 @@
 
                     if (System.IO.File.Exists(destinationFilePath))
                     {
-                        if (new FileInfo(destinationFilePath).Length == file.Size && MainWindow.ConfirmMd5(destinationFilePath, file.Md5))
+                        if (destinationFilePath.EndsWith($"{collectionName}_files.xml") ||
+                            new FileInfo(destinationFilePath).Length == file.Size && MainWindow.ConfirmMd5(destinationFilePath, file.Md5))
                         {
                             this.Report($"File {file.Name} already exists with the correct file size and checksum. Skipping!");
+                            skippingCount++;
                             return;
                         }
 
@@ -204,20 +214,28 @@
                         catch (Exception ex)
                         {
                             this.Report($"An error occurred downloading file {file.Name}. - {ex.Message}", true);
+                            downloadErrorCount++;
                             return;
                         }
                     }
 
-                    if (MainWindow.ConfirmMd5(destinationFilePath, file.Md5))
+                    if (destinationFilePath.EndsWith($"{collectionName}_files.xml") || MainWindow.ConfirmMd5(destinationFilePath, file.Md5))
                     {
                         this.Report($"File {file.Name} downloaded successfully and checksum confirmed!");
+                        downloadSuccessCount++;
                     }
                     else
                     {
                         this.Report($"Checksum does not match on file {file.Name} after downloading!", true);
+                        downloadCorruptCount++;
                     }
                 });
 
+                this.Report($"{count} file(s) from Archive.org were processed!", false, true);
+                this.Report($"{skippingCount} file(s) already existed with the correct file size and checksum.", false, true);
+                this.Report($"{downloadSuccessCount} file(s) were successfully downloaded.", false, true);
+                this.Report($"{downloadErrorCount} file(s) were not downloaded successfully.", downloadErrorCount > 0, downloadErrorCount == 0);
+                this.Report($"{downloadCorruptCount} file(s) had an incorrect checksum after downloading.", downloadCorruptCount > 0, downloadCorruptCount == 0);
                 this.Report($"Process is complete!", false, true);
                 this.ChangeState(false);
             });
@@ -232,6 +250,11 @@
                     return BitConverter.ToString(md5.ComputeHash(stream)).Replace("-", "").ToLowerInvariant() == md5Hash;
                 }
             }
+        }
+
+        private void LogTabItem_Selected(object sender, RoutedEventArgs e)
+        {
+            this.LogListBox.ScrollIntoView(this.LogListBox.SelectedItem);
         }
     }
 }
