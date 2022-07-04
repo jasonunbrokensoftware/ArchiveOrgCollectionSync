@@ -1,6 +1,5 @@
 ﻿namespace ArchiveOrgCollectionSync
 {
-    using System;
     using System.Xml.Serialization;
 
     public class File

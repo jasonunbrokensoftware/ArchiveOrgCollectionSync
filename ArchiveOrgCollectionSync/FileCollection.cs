@@ -2,7 +2,7 @@
 {
     using System.Xml.Serialization;
 
-    [XmlRootAttribute("files")]
+    [XmlRoot("files")]
     public class FileCollection
     {
         [XmlElement("file")]

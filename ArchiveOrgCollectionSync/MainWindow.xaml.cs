@@ -13,7 +13,7 @@
 
     using Microsoft.WindowsAPICodePack.Dialogs;
 
-    public partial class MainWindow : Window
+    public partial class MainWindow
     {
         public MainWindow()
         {
@@ -78,7 +78,7 @@
                 return;
             }
 
-            this.Start(collectionName, folder);
+            this.Start(collectionName, folder, this.DeleteFilesCheckBox.IsChecked == true);
         }
 
         private void ChangeState(bool running)
@@ -90,6 +90,7 @@
                     this.FolderTextBox.IsEnabled =
                     this.PasteButton.IsEnabled =
                     this.BrowseButton.IsEnabled =
+                    this.DeleteFilesCheckBox.IsEnabled =
                     !running;
 
                 if (!running)
@@ -126,7 +127,7 @@
             });
         }
 
-        private void Start(string collectionName, string folder)
+        private void Start(string collectionName, string folder, bool deleteFiles)
         {
             ThreadPool.QueueUserWorkItem(_ =>
             {
@@ -173,70 +174,106 @@
                 int downloadErrorCount = 0;
                 int downloadCorruptCount = 0;
                 int downloadSuccessCount = 0;
+                int deletedCount = 0;
+                int deletedErrorCount = 0;
 
-                Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = 10 }, file =>
-                {                   
-                    count++;
-
-                    this.Dispatcher.Invoke(() =>
+                if (deleteFiles)
+                {
+                    foreach (string filePath in Directory.GetFiles(folder))
                     {
-                        this.ProgressBar.Value = count;
-                    });
-
-                    this.Report($"Reading disk file {file.Name}...");
-
-                    string destinationFilePath = Path.Combine(folder, file.Name);
-
-                    if (System.IO.File.Exists(destinationFilePath))
-                    {
-                        if (destinationFilePath.EndsWith($"{collectionName}_files.xml") ||
-                            new FileInfo(destinationFilePath).Length == file.Size && MainWindow.ConfirmMd5(destinationFilePath, file.Md5))
+                        if (files.Any(f => string.Equals(f.Name, Path.GetFileName(filePath), StringComparison.OrdinalIgnoreCase)))
                         {
-                            this.Report($"File {file.Name} already exists with the correct file size and checksum. Skipping!");
-                            skippingCount++;
-                            return;
+                            continue;
                         }
 
-                        this.Report($"Existing file {file.Name} has an incorrect file size or checksum! Redownloading file...", true);
-                        System.IO.File.Delete(destinationFilePath);
-                    }
-                    else
-                    {
-                        this.Report($"File {file.Name} does not exist on disk! Downloading file...");
-                    }
-
-                    using (var client = new PatientWebClient())
-                    {
                         try
                         {
-                            client.DownloadFile($"https://archive.org/download/{collectionName}/{file.Name}", destinationFilePath);
+                            this.Report($"Deleting file {Path.GetFileName(filePath)} because it does not exist in the Archive.org collection.");
+                            System.IO.File.Delete(filePath);
+                            deletedCount++;
                         }
                         catch (Exception ex)
                         {
-                            this.Report($"An error occurred downloading file {file.Name}. - {ex.Message}", true);
-                            downloadErrorCount++;
-                            return;
+                            this.Report($"Unable to delete file {Path.GetFileName(filePath)} from disk. - {ex.Message}", true);
+                            deletedErrorCount++;
                         }
                     }
+                }
 
-                    if (destinationFilePath.EndsWith($"{collectionName}_files.xml") || MainWindow.ConfirmMd5(destinationFilePath, file.Md5))
+                Parallel.ForEach(
+                    files,
+                    new ParallelOptions { MaxDegreeOfParallelism = 10 },
+                    file =>
                     {
-                        this.Report($"File {file.Name} downloaded successfully and checksum confirmed!");
-                        downloadSuccessCount++;
-                    }
-                    else
-                    {
-                        this.Report($"Checksum does not match on file {file.Name} after downloading!", true);
-                        downloadCorruptCount++;
-                    }
-                });
+                        count++;
+
+                        this.Dispatcher.Invoke(
+                            () =>
+                            {
+                                this.ProgressBar.Value = count;
+                            });
+
+                        this.Report($"Reading disk file {file.Name}...");
+
+                        string destinationFilePath = Path.Combine(folder, file.Name);
+
+                        if (System.IO.File.Exists(destinationFilePath))
+                        {
+                            if (destinationFilePath.EndsWith($"{collectionName}_files.xml") ||
+                                new FileInfo(destinationFilePath).Length == file.Size && MainWindow.ConfirmMd5(destinationFilePath, file.Md5))
+                            {
+                                this.Report($"File {file.Name} already exists with the correct file size and checksum. Skipping!");
+                                skippingCount++;
+                                return;
+                            }
+
+                            this.Report($"Existing file {file.Name} has an incorrect file size or checksum! Re-downloading file...", true);
+                            System.IO.File.Delete(destinationFilePath);
+                        }
+                        else
+                        {
+                            this.Report($"File {file.Name} does not exist on disk! Downloading file...");
+                        }
+
+                        using (var client = new PatientWebClient())
+                        {
+                            try
+                            {
+                                client.DownloadFile($"https://archive.org/download/{collectionName}/{file.Name}", destinationFilePath);
+                            }
+                            catch (Exception ex)
+                            {
+                                this.Report($"An error occurred downloading file {file.Name}. - {ex.Message}", true);
+                                downloadErrorCount++;
+                                return;
+                            }
+                        }
+
+                        if (destinationFilePath.EndsWith($"{collectionName}_files.xml") || MainWindow.ConfirmMd5(destinationFilePath, file.Md5))
+                        {
+                            this.Report($"File {file.Name} downloaded successfully and checksum confirmed!");
+                            downloadSuccessCount++;
+                        }
+                        else
+                        {
+                            this.Report($"Checksum does not match on file {file.Name} after downloading!", true);
+                            downloadCorruptCount++;
+                        }
+                    });
 
                 this.Report($"{count} file(s) from Archive.org were processed!", false, true);
                 this.Report($"{skippingCount} file(s) already existed with the correct file size and checksum.", false, true);
                 this.Report($"{downloadSuccessCount} file(s) were successfully downloaded.", false, true);
                 this.Report($"{downloadErrorCount} file(s) were not downloaded successfully.", downloadErrorCount > 0, downloadErrorCount == 0);
                 this.Report($"{downloadCorruptCount} file(s) had an incorrect checksum after downloading.", downloadCorruptCount > 0, downloadCorruptCount == 0);
-                this.Report($"Process is complete!", false, true);
+
+                if (deleteFiles)
+                {
+                    this.Report($"{deletedCount} file(s) were deleted because they are not in the Archive.org collection.", false, true);
+                    this.Report($"{deletedErrorCount} file(s) could not be deleted from the destination folder.", deletedErrorCount > 0, deletedErrorCount == 0);
+                }
+
+                this.Report("Process is complete!", false, true);
                 this.ChangeState(false);
             });
         }
