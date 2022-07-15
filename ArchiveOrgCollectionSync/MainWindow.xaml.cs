@@ -63,13 +63,29 @@
 
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!this.UrlTextBox.Text.Trim().StartsWith("https://archive.org/details/", StringComparison.OrdinalIgnoreCase) || this.UrlTextBox.Text.Trim().Length < 29)
+            string collectionName;
+
+            if (this.UrlTextBox.Text.Trim().StartsWith("https://archive.org/download/", StringComparison.OrdinalIgnoreCase)
+                && this.UrlTextBox.Text.Length >= 30)
             {
-                MessageBox.Show(this, "Incorrect Archive.org Collection URL. A URL in the format of https://archive.org/details/<collection> is expected.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                collectionName = this.UrlTextBox.Text.Trim().Substring(29);
+            }
+            else if (this.UrlTextBox.Text.Trim().StartsWith("https://archive.org/details/", StringComparison.OrdinalIgnoreCase)
+                && this.UrlTextBox.Text.Trim().Length >= 29)
+            {
+                collectionName = this.UrlTextBox.Text.Trim().Substring(28);
+            }
+            else
+            {
+                MessageBox.Show(this, "Incorrect Archive.org Collection URL. A URL in the format of https://archive.org/details/<collection> or https://archive.org/download/<collection> is expected.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            string collectionName = this.UrlTextBox.Text.Trim().Substring(28);
+            if (collectionName.Contains("/"))
+            {
+                collectionName = collectionName.Substring(0, collectionName.IndexOf("/", StringComparison.OrdinalIgnoreCase));
+            }
+
             string folder = this.FolderTextBox.Text.Trim();
 
             if (!Directory.Exists(folder))
@@ -179,9 +195,11 @@
 
                 if (deleteFiles)
                 {
-                    foreach (string filePath in Directory.GetFiles(folder))
+                    foreach (string filePath in Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories))
                     {
-                        if (files.Any(f => string.Equals(f.Name, Path.GetFileName(filePath), StringComparison.OrdinalIgnoreCase)))
+                        string relativeFilePath = filePath.Replace(folder + "\\", string.Empty).Replace('\\', '/');
+
+                        if (files.Any(f => string.Equals(f.Name, relativeFilePath, StringComparison.OrdinalIgnoreCase)))
                         {
                             continue;
                         }
@@ -216,6 +234,7 @@
                         this.Report($"Reading disk file {file.Name}...");
 
                         string destinationFilePath = Path.Combine(folder, file.Name);
+                        Directory.CreateDirectory(Path.GetDirectoryName(destinationFilePath) ?? throw new InvalidOperationException());
 
                         if (System.IO.File.Exists(destinationFilePath))
                         {
