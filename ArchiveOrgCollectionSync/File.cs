@@ -4,6 +4,12 @@
 
     public class File
     {
+        public File()
+        {
+            this.Name = string.Empty;
+            this.Md5 = string.Empty;
+        }
+
         [XmlAttribute("name")]
         public string Name { get; set; }
 

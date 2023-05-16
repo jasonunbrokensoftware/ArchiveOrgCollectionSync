@@ -30,7 +30,7 @@
 
         private void BrowseButton_Click(object sender, RoutedEventArgs e)
         {
-            string folder = string.IsNullOrWhiteSpace(this.FolderTextBox.Text) || !Directory.Exists(this.FolderTextBox.Text) ? null : this.FolderTextBox.Text;
+            string? folder = string.IsNullOrWhiteSpace(this.FolderTextBox.Text) || !Directory.Exists(this.FolderTextBox.Text) ? null : this.FolderTextBox.Text;
 
             var dialog = new CommonOpenFileDialog
             {
@@ -48,12 +48,14 @@
                 DefaultDirectory = folder
             };
 
-            if (dialog.ShowDialog(Application.Current.Windows.OfType<Window>().SingleOrDefault(x => x.IsActive)) == CommonFileDialogResult.Ok)
+            if (dialog.ShowDialog(Application.Current.Windows.OfType<Window>().Single(x => x.IsActive)) != CommonFileDialogResult.Ok)
             {
-                this.FolderTextBox.Text = dialog.FileName;
-                this.FolderTextBox.Focus();
-                this.FolderTextBox.SelectAll();
+                return;
             }
+
+            this.FolderTextBox.Text = dialog.FileName;
+            this.FolderTextBox.Focus();
+            this.FolderTextBox.SelectAll();
         }
 
         private void TextBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -68,12 +70,12 @@
             if (this.UrlTextBox.Text.Trim().StartsWith("https://archive.org/download/", StringComparison.OrdinalIgnoreCase)
                 && this.UrlTextBox.Text.Length >= 30)
             {
-                collectionName = this.UrlTextBox.Text.Trim().Substring(29);
+                collectionName = this.UrlTextBox.Text.Trim()[29..];
             }
             else if (this.UrlTextBox.Text.Trim().StartsWith("https://archive.org/details/", StringComparison.OrdinalIgnoreCase)
                 && this.UrlTextBox.Text.Trim().Length >= 29)
             {
-                collectionName = this.UrlTextBox.Text.Trim().Substring(28);
+                collectionName = this.UrlTextBox.Text.Trim()[28..];
             }
             else
             {
@@ -81,9 +83,9 @@
                 return;
             }
 
-            if (collectionName.Contains("/"))
+            if (collectionName.Contains('/'))
             {
-                collectionName = collectionName.Substring(0, collectionName.IndexOf("/", StringComparison.OrdinalIgnoreCase));
+                collectionName = collectionName[..collectionName.IndexOf("/", StringComparison.OrdinalIgnoreCase)];
             }
 
             string folder = this.FolderTextBox.Text.Trim();
@@ -94,7 +96,7 @@
                 return;
             }
 
-            this.Start(collectionName, folder, this.DeleteFilesCheckBox.IsChecked == true);
+            this.Start(collectionName, folder, this.DeleteFilesCheckBox.IsChecked == true, this.MaxDownloadsNumericUpDown.Value);
         }
 
         private void ChangeState(bool running)
@@ -107,6 +109,7 @@
                     this.PasteButton.IsEnabled =
                     this.BrowseButton.IsEnabled =
                     this.DeleteFilesCheckBox.IsEnabled =
+                    this.MaxDownloadsNumericUpDown.IsEnabled =
                     !running;
 
                 if (!running)
@@ -143,7 +146,7 @@
             });
         }
 
-        private void Start(string collectionName, string folder, bool deleteFiles)
+        private void Start(string collectionName, string folder, bool deleteFiles, int threads)
         {
             ThreadPool.QueueUserWorkItem(_ =>
             {
@@ -155,10 +158,8 @@
 
                 try
                 {
-                    using (var client = new PatientWebClient())
-                    {
-                        collectionXml = client.DownloadString(collectionXmlUrl);
-                    }
+                    using var client = new PatientWebClient();
+                    collectionXml = client.DownloadString(collectionXmlUrl);
                 }
                 catch (Exception ex)
                 {
@@ -172,10 +173,8 @@
                 {
                     var serializer = new XmlSerializer(typeof(FileCollection));
 
-                    using (var reader = new StringReader(collectionXml))
-                    {
-                        files = ((FileCollection)serializer.Deserialize(reader)).Files;
-                    }
+                    using var reader = new StringReader(collectionXml);
+                    files = ((FileCollection)(serializer.Deserialize(reader) ?? throw new NullReferenceException())).Files;
                 }
                 catch (Exception ex)
                 {
@@ -220,7 +219,7 @@
 
                 Parallel.ForEach(
                     files,
-                    new ParallelOptions { MaxDegreeOfParallelism = 10 },
+                    new ParallelOptions { MaxDegreeOfParallelism = threads },
                     file =>
                     {
                         count++;
@@ -299,13 +298,9 @@
 
         private static bool ConfirmMd5(string filePath, string md5Hash)
         {
-            using (var stream = System.IO.File.OpenRead(filePath))
-            {
-                using (var md5 = MD5.Create())
-                {
-                    return BitConverter.ToString(md5.ComputeHash(stream)).Replace("-", "").ToLowerInvariant() == md5Hash;
-                }
-            }
+            using var stream = System.IO.File.OpenRead(filePath);
+            using var md5 = MD5.Create();
+            return BitConverter.ToString(md5.ComputeHash(stream)).Replace("-", "").ToLowerInvariant() == md5Hash;
         }
 
         private void LogTabItem_Selected(object sender, RoutedEventArgs e)
